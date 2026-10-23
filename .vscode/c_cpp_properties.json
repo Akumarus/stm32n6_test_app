@@ -1,0 +1,19 @@
+{
+    "configurations": [
+        {
+            "name": "STM32_AppliSecure",
+            "compileCommands": "${workspaceFolder}/AppliSecure/build/compile_commands.json",
+            "intelliSenseMode": "linux-gcc-x64",
+            "cStandard": "gnu17",
+            "cppStandard": "gnu++17"
+        },
+        {
+            "name": "STM32_FSBL",
+            "compileCommands": "${workspaceFolder}/FSBL/build/compile_commands.json",
+            "intelliSenseMode": "linux-gcc-x64",
+            "cStandard": "gnu17",
+            "cppStandard": "gnu++17"
+        }
+    ],
+    "version": 4
+}

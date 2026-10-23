@@ -1,0 +1,11 @@
+CompileFlags:
+  CompilationDatabase: AppliSecure/build
+If:
+  PathMatch: AppliSecure/.*
+
+---
+
+CompileFlags:
+  CompilationDatabase: FSBL/build
+If:
+  PathMatch: FSBL/.*
