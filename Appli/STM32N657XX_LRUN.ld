@@ -1,12 +1,12 @@
 /*
 ******************************************************************************
 **
-** @file        : STM32N657XX_LRUN_s.ld
+** @file        : STM32N657XX_LRUN.ld
 **
 ** @author      : GPM Application Team
 **
 ** @brief       : Linker script for STM32N657XX Device from STM32N6 series
-**                      1024 KBytes RAM
+**                      2048 KBytes RAM
 **
 **                Set heap size, stack size and stack location according
 **                to application requirements.
@@ -38,8 +38,8 @@ ENTRY(Reset_Handler)
 /* Memories definition */
 MEMORY
 {
-  ROM    (xrw)    : ORIGIN = 0x34000400,   LENGTH = 399K
-  RAM    (xrw)    : ORIGIN = 0x34064000,   LENGTH = 624K
+  ROM    (xrw)    : ORIGIN = 0x34000400,   LENGTH = 511K
+  RAM    (xrw)    : ORIGIN = 0x34080000,   LENGTH = 1536K
 }
 /* Highest address of the user mode stack */
 _estack = ORIGIN(RAM) + LENGTH(RAM); /* end of "RAM" Ram type memory */

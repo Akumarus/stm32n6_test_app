@@ -26,11 +26,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 set(STM32_MCU_FLAGS  "-mcpu=cortex-m55 -mfpu=fpv5-d16 -mfloat-abi=hard -mcmse " )
 
 #Linker options
-set(STM32_LINKER_SCRIPT STM32N657XX_LRUN_s.ld)
-set(STM32_LINKER_OPTION  -Wl,--cmse-implib\ -Wl,--out-implib="${CMAKE_CURRENT_SOURCE_DIR}/../Secure_nsclib/secure_nsclib.o")
+set(STM32_LINKER_SCRIPT STM32N657XX_LRUN.ld)
+set(STM32_LINKER_OPTION  )
 
 # Set the project name
-set(CMAKE_PROJECT_NAME stm32n6_test_AppliSecure)
+set(CMAKE_PROJECT_NAME stm32n6_Appli)
 project(${CMAKE_PROJECT_NAME})
 
 # Create an executable object type

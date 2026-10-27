@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "i2c.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -33,9 +34,6 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-#define VECT_TAB_NS_OFFSET  0x00400
-#define VTOR_TABLE_NS_START_ADDR (SRAM2_AXI_BASE_NS|VECT_TAB_NS_OFFSET)
-
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -50,7 +48,6 @@
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
-static void NonSecure_Init(void);
 static void SystemIsolation_Config(void);
 /* USER CODE BEGIN PFP */
 
@@ -85,54 +82,23 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_I2C1_Init();
   SystemIsolation_Config();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
 
-  /* Secure SysTick should rather be suspended before calling non-secure  */
-  /* in order to avoid wake-up from sleep mode entered by non-secure      */
-  /* The Secure SysTick shall be resumed on non-secure callable functions */
-  // HAL_SuspendTick();
-
-  // /*************** Setup and jump to non-secure *******************************/
-
-  // NonSecure_Init();
-
-  /* Non-secure software does not return, this code is not executed */
-
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    /* USER CODE END WHILE */
     HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_10);
     HAL_Delay(500);
+    /* USER CODE END WHILE */
+
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
-}
-
-/**
-  * @brief  Non-secure call function
-  *         This function is responsible for Non-secure initialization and switch
-  *         to non-secure state
-  * @retval None
-  */
-static void NonSecure_Init(void)
-{
-  funcptr_NS NonSecure_ResetHandler;
-
-  SCB_NS->VTOR = VTOR_TABLE_NS_START_ADDR;
-
-  /* Set non-secure main stack (MSP_NS) */
-  __TZ_set_MSP_NS((*(uint32_t *)VTOR_TABLE_NS_START_ADDR));
-
-  /* Get non-secure reset handler */
-  NonSecure_ResetHandler = (funcptr_NS)(*((uint32_t *)((VTOR_TABLE_NS_START_ADDR) + 4U)));
-
-  /* Start non-secure state software application */
-  NonSecure_ResetHandler();
 }
 
 /**
@@ -153,7 +119,9 @@ static void NonSecure_Init(void)
   /* RIF-Aware IPs Config */
 
   /* set up GPIO configuration */
+  HAL_GPIO_ConfigPinAttributes(GPIOC,GPIO_PIN_1,GPIO_PIN_SEC|GPIO_PIN_NPRIV);
   HAL_GPIO_ConfigPinAttributes(GPIOG,GPIO_PIN_10,GPIO_PIN_SEC|GPIO_PIN_NPRIV);
+  HAL_GPIO_ConfigPinAttributes(GPIOH,GPIO_PIN_9,GPIO_PIN_SEC|GPIO_PIN_NPRIV);
 
 /* USER CODE BEGIN RIF_Init 1 */
 

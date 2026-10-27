@@ -2,33 +2,8 @@
     "version": "0.2.0",
     "configurations": [
         {
-            // "name": "ST-LINK STM32N6570-DK (secure, RAM)",
-            // "type": "cortex-debug",
-            // "request": "launch",
-            // "servertype": "openocd",
-            // "executable": "${workspaceFolder}/AppliSecure/build/stm32n6_test_AppliSecure.elf",
-            // "device": "STM32N657X0",
-            // "configFiles": ["interface/stlink.cfg", "target/stm32n6x.cfg"],
-            // "gdbPath": "gdb-multiarch",
-            // "objdumpPath": "arm-none-eabi-objdump",
-            // "nmPath": "arm-none-eabi-nm",
-            // "showDevDebugOutput": "raw",
-            // "overrideLaunchCommands": [
-            //     "monitor halt",
-            //     "-target-download",
-            //     "set $sp = *(unsigned int*)0x34000400",
-            //     "set $pc = *(unsigned int*)0x34000404",
-            //     "set *(unsigned int*)0xE000ED08 = 0x34000400"
-            // ],
-            // "overrideRestartCommands": [
-            //     "monitor halt",
-            //     "set $sp = *(unsigned int*)0x34000400",
-            //     "set $pc = *(unsigned int*)0x34000404",
-            //     "set *(unsigned int*)0xE000ED08 = 0x34000400"
-            // ],
-            // "runToEntryPoint": "main",
             "cwd": "${workspaceFolder}",
-            "executable": "${workspaceFolder}/AppliSecure/build/stm32n6_test_AppliSecure.elf",
+            "executable": "${workspaceFolder}/Appli/build/stm32n6_Appli.elf",
             "name": "STM32N6-DK / Cortex-Debug",
             "request": "launch",
             "type": "cortex-debug",
