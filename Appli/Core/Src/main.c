@@ -20,7 +20,7 @@
 #include "main.h"
 #include "i2c.h"
 #include "gpio.h"
-
+#include "imx335.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -85,7 +85,15 @@ int main(void)
   MX_I2C1_Init();
   SystemIsolation_Config();
   /* USER CODE BEGIN 2 */
+  IMX335_Object_t dev;
+  IMX335_IO_t ioCtx;
+  uint32_t id;
+  ioCtx.Address = 0x34U;
+  // ioCtx.Init = BSP
 
+  IMX335_RegisterBusIO(&dev, &ioCtx);
+  IMX335_Init(&dev, IMX335_R2592_1944 , IMX335_RAW_RGGB10);
+  IMX335_ReadID(&dev, &id);
   /* USER CODE END 2 */
 
   /* Infinite loop */

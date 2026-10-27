@@ -2,7 +2,7 @@
     "configurations": [
         {
             "name": "STM32_AppliSecure",
-            "compileCommands": "${workspaceFolder}/AppliSecure/build/compile_commands.json",
+            "compileCommands": "${workspaceFolder}/Appli/build/compile_commands.json",
             "intelliSenseMode": "linux-gcc-x64",
             "cStandard": "gnu17",
             "cppStandard": "gnu++17"
