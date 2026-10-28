@@ -53,7 +53,7 @@
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-static UX_SLAVE_CLASS_CDC_ACM *cdc = UX_NULL;
+UX_SLAVE_CLASS_CDC_ACM *cdc = UX_NULL;
 /* USER CODE END 0 */
 
 /**

@@ -58,12 +58,16 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user sources here
+    ${CMAKE_CURRENT_SOURCE_DIR}/../bsp/main.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../bsp/hal/i2c.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../bsp/sccb/sccb.cpp
 )
 
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user defined library search paths
+    ${CMAKE_CURRENT_SOURCE_DIR}/../bsp/imx335
+    ${CMAKE_CURRENT_SOURCE_DIR}/../bsp/sccb
+    ${CMAKE_CURRENT_SOURCE_DIR}/../bsp/hal
 )
 
 # Add linked libraries
