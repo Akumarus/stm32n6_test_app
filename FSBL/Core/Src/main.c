@@ -18,6 +18,8 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "usb_otg.h"
+#include "app_usbx.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -48,9 +50,31 @@
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
-void PeriphCommonClock_Config(void);
 /* USER CODE BEGIN PFP */
+extern PCD_HandleTypeDef           hpcd_USB_OTG_HS1;
+extern UX_SLAVE_CLASS_CDC_ACM *cdc;
+static uint8_t rx_buf[64];
+static ULONG   rx_len;
 
+/* Чтение команд: возвращает число принятых байт (0 — пока нет данных) */
+uint32_t CdcAcm_Poll(uint8_t **data)
+{
+    if (cdc == UX_NULL) return 0;
+    UINT s = ux_device_class_cdc_acm_read_run(cdc, rx_buf, sizeof(rx_buf), &rx_len);
+    if (s == UX_STATE_NEXT && rx_len > 0) { *data = rx_buf; return rx_len; }
+    return 0;
+}
+
+/* Запись: вызывать, пока не вернёт 1 (всё отправлено) или -1 (ошибка) */
+int CdcAcm_WriteStep(uint8_t *buf, uint32_t len)
+{
+    static ULONG actual;
+    if (cdc == UX_NULL) return -1;
+    UINT s = ux_device_class_cdc_acm_write_run(cdc, buf, len, &actual);
+    if (s == UX_STATE_NEXT)  return 1;
+    if (s == UX_STATE_WAIT)  return 0;
+    return -1;
+}
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -79,23 +103,27 @@ int main(void)
   /* Configure the system clock */
   SystemClock_Config();
 
-  /* Configure the peripherals common clocks */
-  PeriphCommonClock_Config();
-
   /* USER CODE BEGIN SysInit */
 
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_USB1_OTG_HS_PCD_Init();
+  MX_USBX_Init();
   /* USER CODE BEGIN 2 */
-
+  HAL_PCDEx_SetRxFiFo(&hpcd_USB_OTG_HS1, 0x100);
+  HAL_PCDEx_SetTxFiFo(&hpcd_USB_OTG_HS1, 0, 0x40);   /* EP0 */
+  HAL_PCDEx_SetTxFiFo(&hpcd_USB_OTG_HS1, 1, 0x20);   /* CDC notification EP */
+  HAL_PCDEx_SetTxFiFo(&hpcd_USB_OTG_HS1, 2, 0x80);  /* CDC bulk IN */
+  HAL_PCD_Start(&hpcd_USB_OTG_HS1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    ux_system_tasks_run();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -142,6 +170,9 @@ void SystemClock_Config(void)
     Error_Handler();
   }
 
+  /* Wait HSE stabilization time before its selection as PLL source. */
+  HAL_Delay(HSE_STARTUP_TIMEOUT);
+
   /** Get current CPU/System buses clocks configuration and if necessary switch
  to intermediate HSI clock to ensure target clock can be set
   */
@@ -165,9 +196,9 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.PLL1.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL1.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL1.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL1.PLLM = 1;
-  RCC_OscInitStruct.PLL1.PLLN = 25;
+  RCC_OscInitStruct.PLL1.PLLN = 34;
   RCC_OscInitStruct.PLL1.PLLFractional = 0;
   RCC_OscInitStruct.PLL1.PLLP1 = 1;
   RCC_OscInitStruct.PLL1.PLLP2 = 1;
@@ -193,26 +224,6 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB4CLKDivider = RCC_APB4_DIV1;
   RCC_ClkInitStruct.APB5CLKDivider = RCC_APB5_DIV1;
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct) != HAL_OK)
-  {
-    Error_Handler();
-  }
-}
-
-/**
-  * @brief Peripherals Common Clock Configuration
-  * @retval None
-  */
-void PeriphCommonClock_Config(void)
-{
-  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
-
-  /** Initializes the peripherals clock
-  */
-  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_CKPER;
-  PeriphClkInitStruct.CkperClockSelection = RCC_CLKPCLKSOURCE_IC5;
-  PeriphClkInitStruct.ICSelection[RCC_IC5].ClockSelection = RCC_ICCLKSOURCE_PLL1;
-  PeriphClkInitStruct.ICSelection[RCC_IC5].ClockDivider = 80;
-  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
   {
     Error_Handler();
   }

@@ -1,11 +1,11 @@
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
-  * @file    gpio.h
-  * @brief   This file contains all the function prototypes for
-  *          the gpio.c file
+  * @file    app_usbx.h
+  * @author  MCD Application Team
+  * @brief   USBX applicative header file
   ******************************************************************************
-  * @attention
+   * @attention
   *
   * Copyright (c) 2026 STMicroelectronics.
   * All rights reserved.
@@ -18,32 +18,43 @@
   */
 /* USER CODE END Header */
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __GPIO_H__
-#define __GPIO_H__
+#ifndef __APP_USBX_H__
+#define __APP_USBX_H__
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "main.h"
+#include "ux_api.h"
 
+#include "app_usbx_device.h"
+
+/* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
 /* USER CODE END Includes */
 
-/* USER CODE BEGIN Private defines */
+/* Exported types ------------------------------------------------------------*/
+/* USER CODE BEGIN ET */
 
-/* USER CODE END Private defines */
+/* USER CODE END ET */
 
-void MX_GPIO_Init(void);
+/* Exported constants --------------------------------------------------------*/
+#define USBX_APP_MEM_POOL_SIZE       32*1024
+#define USBX_MEMORY_STACK_SIZE       32*1024
+/* USER CODE BEGIN EC */
 
-/* USER CODE BEGIN Prototypes */
+/* USER CODE END EC */
 
-/* USER CODE END Prototypes */
+/* Exported functions prototypes ---------------------------------------------*/
+UINT MX_USBX_Init(VOID);
+
+/* USER CODE BEGIN 1 */
+
+/* USER CODE END 1 */
 
 #ifdef __cplusplus
 }
 #endif
-#endif /*__ GPIO_H__ */
-
+#endif /* __APP_USBX_H__ */

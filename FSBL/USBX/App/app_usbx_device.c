@@ -22,7 +22,7 @@
 #include "app_usbx_device.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "ux_dcd_stm32.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -106,17 +106,7 @@ UINT MX_USBX_Device_Stack_Init(void)
   UCHAR *language_id_framework;
 
   /* USER CODE BEGIN MX_USBX_Device_Stack_Init 0 */
-  HAL_PCDEx_SetRxFiFo(&hpcd_USB_OTG_HS1, 0x200);
-  HAL_PCDEx_SetTxFiFo(&hpcd_USB_OTG_HS1, 0, 0x40);   /* EP0 */
-  HAL_PCDEx_SetTxFiFo(&hpcd_USB_OTG_HS1, 1, 0x20);   /* CDC notification EP */
-  HAL_PCDEx_SetTxFiFo(&hpcd_USB_OTG_HS1, 2, 0x100);  /* CDC bulk IN */
 
-  /* Привязать контроллер к USBX и запустить PCD */
-  if (ux_dcd_stm32_initialize((ULONG)USB1_OTG_HS, (ULONG)&hpcd_USB_OTG_HS1) != UX_SUCCESS)
-  {
-    return UX_ERROR;
-  }
-  HAL_PCD_Start(&hpcd_USB_OTG_HS1);
   /* USER CODE END MX_USBX_Device_Stack_Init 0 */
   /* Get Device Framework High Speed and get the length */
   device_framework_high_speed = USBD_Get_Device_Framework_Speed(USBD_HIGH_SPEED,
@@ -175,6 +165,8 @@ UINT MX_USBX_Device_Stack_Init(void)
     /* USER CODE END USBX_DEVICE_CDC_ACM_REGISTER_ERROR */
   }
 
+  /* Initialize and link controller HAL driver */
+  ux_dcd_stm32_initialize((ULONG)USB1_OTG_HS, (ULONG)&hpcd_USB_OTG_HS1);
   /* USER CODE BEGIN MX_USBX_Device_Stack_Init_PostTreatment */
   /* USER CODE END MX_USBX_Device_Stack_Init_PostTreatment */
 
@@ -200,6 +192,11 @@ UINT MX_USBX_Device_Stack_DeInit(void)
   /* USER CODE END MX_USBX_Device_Stack_DeInit_PreTreatment_0 */
 
   /* Unregister USB device controller. */
+
+  if (_ux_dcd_stm32_uninitialize((ULONG)USB1_OTG_HS, (ULONG)&hpcd_USB_OTG_HS1) != UX_SUCCESS)
+  {
+    return UX_ERROR;
+  }
 
   /* Unregister CDC ACM class. */
   if (ux_device_stack_class_unregister(_ux_system_slave_class_cdc_acm_name,

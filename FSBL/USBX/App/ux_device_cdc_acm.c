@@ -43,7 +43,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN PV */
-static UX_SLAVE_CLASS_CDC_ACM *cdc = UX_NULL;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -53,7 +53,7 @@ static UX_SLAVE_CLASS_CDC_ACM *cdc = UX_NULL;
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+static UX_SLAVE_CLASS_CDC_ACM *cdc = UX_NULL;
 /* USER CODE END 0 */
 
 /**
@@ -66,7 +66,6 @@ VOID USBD_CDC_ACM_Activate(VOID *cdc_acm_instance)
 {
   /* USER CODE BEGIN USBD_CDC_ACM_Activate */
   cdc = (UX_SLAVE_CLASS_CDC_ACM *)cdc_acm_instance;
-  UX_PARAMETER_NOT_USED(cdc_acm_instance);
   /* USER CODE END USBD_CDC_ACM_Activate */
 
   return;
@@ -81,8 +80,7 @@ VOID USBD_CDC_ACM_Activate(VOID *cdc_acm_instance)
 VOID USBD_CDC_ACM_Deactivate(VOID *cdc_acm_instance)
 {
   /* USER CODE BEGIN USBD_CDC_ACM_Deactivate */
-  cdc = UX_NULL; 
-  UX_PARAMETER_NOT_USED(cdc_acm_instance);
+  cdc = UX_NULL;
   /* USER CODE END USBD_CDC_ACM_Deactivate */
 
   return;

@@ -3,7 +3,7 @@
     "configurations": [
         {
             "cwd": "${workspaceFolder}",
-            "executable": "${workspaceFolder}/Appli/build/stm32n6_Appli.elf",
+            "executable": "${workspaceFolder}/FSBL/build/stm32n6_FSBL.elf",
             "name": "STM32N6-DK / Cortex-Debug",
             "request": "launch",
             "type": "cortex-debug",
