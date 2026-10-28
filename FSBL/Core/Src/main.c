@@ -112,10 +112,6 @@ int main(void)
   MX_USB1_OTG_HS_PCD_Init();
   MX_USBX_Init();
   /* USER CODE BEGIN 2 */
-  HAL_PCDEx_SetRxFiFo(&hpcd_USB_OTG_HS1, 0x100);
-  HAL_PCDEx_SetTxFiFo(&hpcd_USB_OTG_HS1, 0, 0x40);   /* EP0 */
-  HAL_PCDEx_SetTxFiFo(&hpcd_USB_OTG_HS1, 1, 0x20);   /* CDC notification EP */
-  HAL_PCDEx_SetTxFiFo(&hpcd_USB_OTG_HS1, 2, 0x80);  /* CDC bulk IN */
   HAL_PCD_Start(&hpcd_USB_OTG_HS1);
   /* USER CODE END 2 */
 

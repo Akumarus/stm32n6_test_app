@@ -59,7 +59,10 @@ void MX_USB1_OTG_HS_PCD_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN USB1_OTG_HS_Init 2 */
-
+  HAL_PCDEx_SetRxFiFo(&hpcd_USB_OTG_HS1, 0x200);
+  HAL_PCDEx_SetTxFiFo(&hpcd_USB_OTG_HS1, 0, 0x40);
+  HAL_PCDEx_SetTxFiFo(&hpcd_USB_OTG_HS1, 1, 0x20);
+  HAL_PCDEx_SetTxFiFo(&hpcd_USB_OTG_HS1, 2, 0x100);
   /* USER CODE END USB1_OTG_HS_Init 2 */
 
 }
