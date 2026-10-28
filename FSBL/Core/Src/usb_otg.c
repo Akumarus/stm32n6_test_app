@@ -21,7 +21,13 @@
 #include "usb_otg.h"
 
 /* USER CODE BEGIN 0 */
-
+#define RESET_USB_MACRO() do { \
+    LL_AHB5_GRP1_ForceReset(0x00800000); \
+    __HAL_RCC_USB1_OTG_HS_FORCE_RESET(); \
+    __HAL_RCC_USB1_OTG_HS_PHY_FORCE_RESET(); \
+    LL_RCC_HSE_SelectHSEDiv2AsDiv2Clock(); \
+    LL_AHB5_GRP1_ReleaseReset(0x00800000); \
+} while(0)
 /* USER CODE END 0 */
 
 PCD_HandleTypeDef hpcd_USB_OTG_HS1;
@@ -83,8 +89,21 @@ void HAL_PCD_MspInit(PCD_HandleTypeDef* pcdHandle)
     /* USB1_OTG_HS clock enable */
     __HAL_RCC_USB1_OTG_HS_CLK_ENABLE();
     __HAL_RCC_USB1_OTG_HS_PHY_CLK_ENABLE();
-  /* USER CODE BEGIN USB1_OTG_HS_MspInit 1 */
 
+    /* USB1_OTG_HS interrupt Init */
+    HAL_NVIC_SetPriority(USB1_OTG_HS_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(USB1_OTG_HS_IRQn);
+  /* USER CODE BEGIN USB1_OTG_HS_MspInit 1 */
+  RESET_USB_MACRO();
+  HAL_Delay(1);
+  USB1_HS_PHYC->USBPHYC_CR &= ~(0x7 << 0x4);
+  USB1_HS_PHYC->USBPHYC_CR |= (0x1 << 16) |   /* OTGDISABLE0 */
+                              (0x2 << 4)  |    /* FSEL = 2 (24 МГц) */
+                              (0x1 << 2)  |    /* CMN */
+                               0x1U;           /* RETENABLEN */
+  __HAL_RCC_USB1_OTG_HS_PHY_RELEASE_RESET();
+  HAL_Delay(1);
+  __HAL_RCC_USB1_OTG_HS_RELEASE_RESET();
   /* USER CODE END USB1_OTG_HS_MspInit 1 */
   }
 }
@@ -103,6 +122,9 @@ void HAL_PCD_MspDeInit(PCD_HandleTypeDef* pcdHandle)
 
     /* Disable VDDUSB */
       HAL_PWREx_DisableVddUSB();
+
+    /* USB1_OTG_HS interrupt Deinit */
+    HAL_NVIC_DisableIRQ(USB1_OTG_HS_IRQn);
   /* USER CODE BEGIN USB1_OTG_HS_MspDeInit 1 */
 
   /* USER CODE END USB1_OTG_HS_MspDeInit 1 */
