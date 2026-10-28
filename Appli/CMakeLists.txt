@@ -60,6 +60,22 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../Usr/BSP/imx335/imx335_reg.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../Usr/BSP/imx335/imx335.c
+
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Middlewares/ST/usbx/common/usbx_stm32_device_controllers/ux_dcd_stm32_callback.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Middlewares/ST/usbx/common/usbx_stm32_device_controllers/ux_dcd_stm32_endpoint_create.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Middlewares/ST/usbx/common/usbx_stm32_device_controllers/ux_dcd_stm32_endpoint_destroy.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Middlewares/ST/usbx/common/usbx_stm32_device_controllers/ux_dcd_stm32_endpoint_reset.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Middlewares/ST/usbx/common/usbx_stm32_device_controllers/ux_dcd_stm32_endpoint_stall.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Middlewares/ST/usbx/common/usbx_stm32_device_controllers/ux_dcd_stm32_endpoint_status.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Middlewares/ST/usbx/common/usbx_stm32_device_controllers/ux_dcd_stm32_frame_number_get.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Middlewares/ST/usbx/common/usbx_stm32_device_controllers/ux_dcd_stm32_function.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Middlewares/ST/usbx/common/usbx_stm32_device_controllers/ux_dcd_stm32_initialize_complete.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Middlewares/ST/usbx/common/usbx_stm32_device_controllers/ux_dcd_stm32_initialize.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Middlewares/ST/usbx/common/usbx_stm32_device_controllers/ux_dcd_stm32_interrupt_handler.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Middlewares/ST/usbx/common/usbx_stm32_device_controllers/ux_dcd_stm32_transfer_abort.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Middlewares/ST/usbx/common/usbx_stm32_device_controllers/ux_dcd_stm32_transfer_request.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Middlewares/ST/usbx/common/usbx_stm32_device_controllers/ux_dcd_stm32_transfer_run.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Middlewares/ST/usbx/common/usbx_stm32_device_controllers/ux_dcd_stm32_uninitialize.c
 )
 
 # Link directories setup

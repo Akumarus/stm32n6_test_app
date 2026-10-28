@@ -19,8 +19,10 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "i2c.h"
+#include "usb_otg.h"
+#include "app_usbx.h"
 #include "gpio.h"
-#include "imx335.h"
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -38,13 +40,38 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+void PeriphCommonClock_Config(void);
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+/* ux_device_cdc_acm.c, USER CODE 1 */
+extern UX_SLAVE_CLASS_CDC_ACM *cdc = UX_NULL;
 
+
+static uint8_t rx_buf[64];
+static ULONG   rx_len;
+
+/* Чтение команд: возвращает число принятых байт (0 — пока нет данных) */
+uint32_t CdcAcm_Poll(uint8_t **data)
+{
+    if (cdc == UX_NULL) return 0;
+    UINT s = ux_device_class_cdc_acm_read_run(cdc, rx_buf, sizeof(rx_buf), &rx_len);
+    if (s == UX_STATE_NEXT && rx_len > 0) { *data = rx_buf; return rx_len; }
+    return 0;
+}
+
+/* Запись: вызывать, пока не вернёт 1 (всё отправлено) или -1 (ошибка) */
+int CdcAcm_WriteStep(uint8_t *buf, uint32_t len)
+{
+    static ULONG actual;
+    if (cdc == UX_NULL) return -1;
+    UINT s = ux_device_class_cdc_acm_write_run(cdc, buf, len, &actual);
+    if (s == UX_STATE_NEXT)  return 1;
+    if (s == UX_STATE_WAIT)  return 0;
+    return -1;
+}
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -77,29 +104,24 @@ int main(void)
   /* USER CODE END Init */
 
   /* USER CODE BEGIN SysInit */
-
+  PeriphCommonClock_Config();
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_I2C1_Init();
+  MX_USB1_OTG_HS_PCD_Init();
+  MX_USBX_Init();
   SystemIsolation_Config();
   /* USER CODE BEGIN 2 */
-  IMX335_Object_t dev;
-  IMX335_IO_t ioCtx;
-  uint32_t id;
-  ioCtx.Address = 0x34U;
-  // ioCtx.Init = BSP
 
-  IMX335_RegisterBusIO(&dev, &ioCtx);
-  IMX335_Init(&dev, IMX335_R2592_1944 , IMX335_RAW_RGGB10);
-  IMX335_ReadID(&dev, &id);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    ux_system_tasks_run();
     HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_10);
     HAL_Delay(500);
     /* USER CODE END WHILE */
@@ -107,6 +129,26 @@ int main(void)
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
+}
+
+/**
+  * @brief Peripherals Common Clock Configuration
+  * @retval None
+  */
+void PeriphCommonClock_Config(void)
+{
+  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
+
+  /** Initializes the peripherals clock
+  */
+  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_CKPER;
+  PeriphClkInitStruct.CkperClockSelection = RCC_CLKPCLKSOURCE_IC5;
+  PeriphClkInitStruct.ICSelection[RCC_IC5].ClockSelection = RCC_ICCLKSOURCE_PLL1;
+  PeriphClkInitStruct.ICSelection[RCC_IC5].ClockDivider = 80;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
 }
 
 /**
