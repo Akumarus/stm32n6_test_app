@@ -5,6 +5,7 @@ extern "C" {
     #include "ux_device_class_cdc_acm.h"
 }
 #include "gpio.h"
+#include "i2c.h"
 
 extern "C" {
     UINT MX_USBX_Init(void);
@@ -58,6 +59,7 @@ extern "C" int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_I2C1_Init();
   MX_USB1_OTG_HS_PCD_Init();
   MX_USBX_Init();
   /* USER CODE BEGIN 2 */
@@ -69,6 +71,8 @@ extern "C" int main(void)
   while (1)
   {
     ux_system_tasks_run();
+    HAL_GPIO_TogglePin(GPIOG, GPIO_PIN_10);
+    HAL_Delay(500);
     uint8_t *p;
     uint32_t n = CdcAcm_Poll(&p);
     if (n) {
