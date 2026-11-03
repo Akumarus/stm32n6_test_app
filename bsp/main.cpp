@@ -76,6 +76,7 @@ extern "C" int main(void)
   static Sccb sccb(i2c1, 0x34);
   static Imx335 imx335(sccb);
   data = imx335.ReadId();
+  auto res = imx335.Init();
 
   /* USER CODE END 2 */
 
