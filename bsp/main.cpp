@@ -36,6 +36,11 @@ int CdcAcm_WriteStep(uint8_t *buf, uint32_t len)
     return -1;
 }
 
+#include "sccb.hpp"
+#include "i2c.hpp"
+#include "imx335.hpp"
+
+
 extern "C" int main(void)
 {
 
@@ -64,6 +69,14 @@ extern "C" int main(void)
   MX_USBX_Init();
   /* USER CODE BEGIN 2 */
   HAL_PCD_Start(&hpcd_USB_OTG_HS1);
+
+  uint32_t data = 0xFF;
+  static I2c i2c1(hi2c1, 1000);
+  i2c1.Init();
+  static Sccb sccb(i2c1, 0x34);
+  static Imx335 imx335(sccb);
+  data = imx335.ReadId();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
