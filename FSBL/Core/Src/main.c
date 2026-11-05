@@ -55,30 +55,6 @@
 void SystemClock_Config(void);
 void SystemIsolation_Config(void);
 /* USER CODE BEGIN PFP */
-extern PCD_HandleTypeDef           hpcd_USB_OTG_HS1;
-extern UX_SLAVE_CLASS_CDC_ACM *cdc;
-static uint8_t rx_buf[64];
-static ULONG   rx_len;
-
-/* Чтение команд: возвращает число принятых байт (0 — пока нет данных) */
-uint32_t CdcAcm_Poll(uint8_t **data)
-{
-    if (cdc == UX_NULL) return 0;
-    UINT s = ux_device_class_cdc_acm_read_run(cdc, rx_buf, sizeof(rx_buf), &rx_len);
-    if (s == UX_STATE_NEXT && rx_len > 0) { *data = rx_buf; return rx_len; }
-    return 0;
-}
-
-/* Запись: вызывать, пока не вернёт 1 (всё отправлено) или -1 (ошибка) */
-int CdcAcm_WriteStep(uint8_t *buf, uint32_t len)
-{
-    static ULONG actual;
-    if (cdc == UX_NULL) return -1;
-    UINT s = ux_device_class_cdc_acm_write_run(cdc, buf, len, &actual);
-    if (s == UX_STATE_NEXT)  return 1;
-    if (s == UX_STATE_WAIT)  return 0;
-    return -1;
-}
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
