@@ -59,10 +59,6 @@ void HAL_DCMIPP_PIPE_VsyncEventCallback(DCMIPP_HandleTypeDef *h, uint32_t pipe) 
 void HAL_DCMIPP_PIPE_FrameEventCallback(DCMIPP_HandleTypeDef *h, uint32_t pipe)
 {
     cnt_frame++;
-    if (cnt_frame == 50) {
-        HAL_DCMIPP_CSI_PIPE_Stop(&hdcmipp, DCMIPP_PIPE1, DCMIPP_VIRTUAL_CHANNEL0);
-        frame_ready = true;
-    }
     if (pipe == DCMIPP_PIPE1) frame_ready = true;
 }
 void HAL_DCMIPP_PIPE_ErrorCallback(DCMIPP_HandleTypeDef *h, uint32_t pipe) { cnt_pipe_err++; last_err = h->ErrorCode; }
@@ -129,10 +125,7 @@ extern "C" int main(void)
   auto res = imx335.Init();
   (void)data; (void)res;
   // imx335.EnableTestPattern(2);
-  // uint16_t *px = (uint16_t*)frame_buf;
-  // for (int y = 0; y < FRAME_H; y++)
-  //   for (int x = 0; x < FRAME_W; x++)
-  //     px[y*FRAME_W + x] = (x < 213) ? 0xF800 : (x < 426) ? 0x07E0 : 0x001F;
+
   memset(frame_buf, 0x55, FRAME_SIZE);
   if (HAL_DCMIPP_CSI_PIPE_Start(&hdcmipp, DCMIPP_PIPE1, DCMIPP_VIRTUAL_CHANNEL0,
                                 (uint32_t)frame_buf, DCMIPP_MODE_CONTINUOUS) != HAL_OK)
@@ -182,10 +175,10 @@ extern "C" int main(void)
         if (r != 0)
         {
             tx = IDLE;
-            // /* следующий кадр */
-            // HAL_DCMIPP_CSI_PIPE_Stop(&hdcmipp, DCMIPP_PIPE1, DCMIPP_VIRTUAL_CHANNEL0);
-            // HAL_DCMIPP_CSI_PIPE_Start(&hdcmipp, DCMIPP_PIPE1, DCMIPP_VIRTUAL_CHANNEL0,
-            //                           (uint32_t)frame_buf, DCMIPP_MODE_SNAPSHOT);
+            /* следующий кадр */
+            HAL_DCMIPP_CSI_PIPE_Stop(&hdcmipp, DCMIPP_PIPE1, DCMIPP_VIRTUAL_CHANNEL0);
+            HAL_DCMIPP_CSI_PIPE_Start(&hdcmipp, DCMIPP_PIPE1, DCMIPP_VIRTUAL_CHANNEL0,
+                                      (uint32_t)frame_buf, DCMIPP_MODE_SNAPSHOT);
         }
     }
   }
