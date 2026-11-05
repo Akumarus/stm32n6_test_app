@@ -56,7 +56,9 @@ void SVC_Handler(void);
 void DebugMon_Handler(void);
 void PendSV_Handler(void);
 void SysTick_Handler(void);
+void DCMIPP_IRQHandler(void);
 void USB1_OTG_HS_IRQHandler(void);
+void CSI_IRQHandler(void);
 /* USER CODE BEGIN EFP */
 
 /* USER CODE END EFP */

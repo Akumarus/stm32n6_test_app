@@ -55,6 +55,7 @@
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
+extern DCMIPP_HandleTypeDef hdcmipp;
 extern PCD_HandleTypeDef hpcd_USB_OTG_HS1;
 /* USER CODE BEGIN EV */
 
@@ -214,6 +215,20 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /**
+  * @brief This function handles DCMIPP global interrupt.
+  */
+void DCMIPP_IRQHandler(void)
+{
+  /* USER CODE BEGIN DCMIPP_IRQn 0 */
+
+  /* USER CODE END DCMIPP_IRQn 0 */
+  HAL_DCMIPP_IRQHandler(&hdcmipp);
+  /* USER CODE BEGIN DCMIPP_IRQn 1 */
+
+  /* USER CODE END DCMIPP_IRQn 1 */
+}
+
+/**
   * @brief This function handles USB1 OTG HS interrupt.
   */
 void USB1_OTG_HS_IRQHandler(void)
@@ -225,6 +240,20 @@ void USB1_OTG_HS_IRQHandler(void)
   /* USER CODE BEGIN USB1_OTG_HS_IRQn 1 */
 
   /* USER CODE END USB1_OTG_HS_IRQn 1 */
+}
+
+/**
+  * @brief This function handles CSI global interrupt.
+  */
+void CSI_IRQHandler(void)
+{
+  /* USER CODE BEGIN CSI_IRQn 0 */
+
+  /* USER CODE END CSI_IRQn 0 */
+  HAL_DCMIPP_CSI_IRQHandler(&hdcmipp);
+  /* USER CODE BEGIN CSI_IRQn 1 */
+
+  /* USER CODE END CSI_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */

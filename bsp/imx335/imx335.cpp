@@ -3,9 +3,12 @@
 bool Imx335::Init()
 {
     bool res;
-    res = WriteTable(imx335::Res2592x1944, sizeof(imx335::Res2592x1944));
-    res = WriteTable(imx335::Mode2Lane10bit, sizeof(imx335::Mode2Lane10bit));
-    res = SetStream(true);
+    uint16_t count1 = sizeof(imx335::Res2592x1944) / sizeof(imx335::Res2592x1944[0]);
+    uint16_t count2 = sizeof(imx335::Mode2Lane10bit) / sizeof(imx335::Mode2Lane10bit[0]);
+    res = WriteTable(imx335::Res2592x1944, sizeof(imx335::Res2592x1944) / sizeof(imx335::Res2592x1944[0]));
+    res = WriteTable(imx335::Mode2Lane10bit, sizeof(imx335::Mode2Lane10bit) / sizeof(imx335::Mode2Lane10bit[0]));
+    // res = SetStream(true);
+    HAL_Delay(20);
     return res;
 }
 
