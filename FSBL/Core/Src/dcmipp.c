@@ -60,7 +60,15 @@ void MX_DCMIPP_Init(void)
     Error_Handler();
   }
 
-  /** CSI: 2 lanes, 1600 Mbps, VC0, RAW10 */
+  /** Pipe 0 Config
+  */
+  pCSI_PipeConfig.DataTypeMode = DCMIPP_DTMODE_DTIDA;
+  pCSI_PipeConfig.DataTypeIDA = DCMIPP_DT_RAW10;
+  pCSI_PipeConfig.DataTypeIDB = DCMIPP_DT_RAW10;
+  if (HAL_DCMIPP_CSI_PIPE_SetConfig(&hdcmipp, DCMIPP_PIPE0, &pCSI_PipeConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
   pCSI_Config.PHYBitrate = DCMIPP_CSI_PHY_BT_1600;
   pCSI_Config.DataLaneMapping = DCMIPP_CSI_PHYSICAL_DATA_LANES;
   pCSI_Config.NumberOfLanes = DCMIPP_CSI_TWO_DATA_LANES;
@@ -68,23 +76,22 @@ void MX_DCMIPP_Init(void)
   {
     Error_Handler();
   }
-  if (HAL_DCMIPP_CSI_SetVCConfig(&hdcmipp, 0U, DCMIPP_CSI_DT_BPP10) != HAL_OK)
+  pPipeConfig.FrameRate = DCMIPP_FRAME_RATE_ALL;
+  pPipeConfig.PixelPipePitch = 10;
+  pPipeConfig.PixelPackerFormat = DCMIPP_PIXEL_PACKER_FORMAT_RGB888_YUV444_1;
+  if (HAL_DCMIPP_PIPE_SetConfig(&hdcmipp, DCMIPP_PIPE0, &pPipeConfig) != HAL_OK)
   {
     Error_Handler();
   }
+  HAL_DCMIPP_CSI_SetVCConfig(&hdcmipp, 0U, DCMIPP_CSI_DT_BPP10);
 
-  /** Pipe 1 Config: вход RAW10 */
-  pCSI_PipeConfig.DataTypeMode = DCMIPP_DTMODE_DTIDA;
-  pCSI_PipeConfig.DataTypeIDA = DCMIPP_DT_RAW10;
-  pCSI_PipeConfig.DataTypeIDB = DCMIPP_DT_RAW10;
+  /** Pipe 1 Config
+  */
   if (HAL_DCMIPP_CSI_PIPE_SetConfig(&hdcmipp, DCMIPP_PIPE1, &pCSI_PipeConfig) != HAL_OK)
   {
     Error_Handler();
   }
-
-  /** Pipe 1 Config: выход RGB565, 640 пикселей * 2 байта = 1280 байт на строку */
-  pPipeConfig.FrameRate = DCMIPP_FRAME_RATE_ALL;
-  pPipeConfig.PixelPipePitch = OUT_W * 2;
+  pPipeConfig.PixelPipePitch = 1280;
   pPipeConfig.PixelPackerFormat = DCMIPP_PIXEL_PACKER_FORMAT_RGB565_1;
   if (HAL_DCMIPP_PIPE_SetConfig(&hdcmipp, DCMIPP_PIPE1, &pPipeConfig) != HAL_OK)
   {
@@ -127,14 +134,13 @@ void HAL_DCMIPP_MspInit(DCMIPP_HandleTypeDef* dcmippHandle)
 
   /* USER CODE END DCMIPP_MspInit 0 */
 
-  /** Clocks: DCMIPP 300 MHz (IC17 = 1200/4), CSI 20 MHz (IC18 = 1200/60).
-    * Источник PLL1 при PLL1 = 1200 MHz. Если в вашем SystemClock_Config
-    * 1200 MHz даёт PLL4 - замените на RCC_ICCLKSOURCE_PLL4. */
+  /** Initializes the peripherals clock
+  */
     PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_DCMIPP|RCC_PERIPHCLK_CSI;
     PeriphClkInitStruct.DcmippClockSelection = RCC_DCMIPPCLKSOURCE_IC17;
-    PeriphClkInitStruct.ICSelection[RCC_IC17].ClockSelection = RCC_ICCLKSOURCE_PLL1;
+    PeriphClkInitStruct.ICSelection[RCC_IC17].ClockSelection = RCC_ICCLKSOURCE_PLL4;
     PeriphClkInitStruct.ICSelection[RCC_IC17].ClockDivider = 4;
-    PeriphClkInitStruct.ICSelection[RCC_IC18].ClockSelection = RCC_ICCLKSOURCE_PLL1;
+    PeriphClkInitStruct.ICSelection[RCC_IC18].ClockSelection = RCC_ICCLKSOURCE_PLL4;
     PeriphClkInitStruct.ICSelection[RCC_IC18].ClockDivider = 60;
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
     {
@@ -183,3 +189,4 @@ void HAL_DCMIPP_MspDeInit(DCMIPP_HandleTypeDef* dcmippHandle)
 /* USER CODE BEGIN 1 */
 
 /* USER CODE END 1 */
+

@@ -72,6 +72,7 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 void SystemClock_Config(void);
+void SystemIsolation_Config(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/

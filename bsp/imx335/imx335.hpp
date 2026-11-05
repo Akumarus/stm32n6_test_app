@@ -8,6 +8,7 @@ public:
     bool Init();
     uint32_t ReadId();
     bool SetStream(bool on);
+    bool EnableTestPattern(uint8_t mode);
 
 private:
     bool WriteTable(const imx335::Reg* regs, uint16_t n);

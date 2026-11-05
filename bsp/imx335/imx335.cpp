@@ -34,3 +34,13 @@ bool Imx335::WriteTable(const imx335::Reg *regs, uint16_t n)
     }
     return true;
 }
+
+bool Imx335::EnableTestPattern(uint8_t mode)
+{
+    sccb.WriteReg(0x329E, mode);
+    static constexpr imx335::Reg en[] = {
+        {0x3148, 0x10}, {0x3280, 0x00}, {0x329C, 0x01},
+        {0x32A0, 0x11}, {0x3302, 0x00}, {0x3303, 0x00}, {0x336C, 0x00},
+    };
+    return WriteTable(en, sizeof(en)/sizeof(en[0]));
+}

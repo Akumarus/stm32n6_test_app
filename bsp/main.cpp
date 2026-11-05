@@ -47,6 +47,7 @@ int CdcAcm_WriteStep(uint8_t *buf, uint32_t len)
 #define FRAME_H     480
 #define FRAME_SIZE  (FRAME_W * FRAME_H * 2)
 static uint8_t * const frame_buf = (uint8_t*)0x34000000;
+// static uint8_t * const frame_buf = (uint8_t*)0x24000000;
 
 /* Диагностика */
 volatile bool     frame_ready;
@@ -58,6 +59,10 @@ void HAL_DCMIPP_PIPE_VsyncEventCallback(DCMIPP_HandleTypeDef *h, uint32_t pipe) 
 void HAL_DCMIPP_PIPE_FrameEventCallback(DCMIPP_HandleTypeDef *h, uint32_t pipe)
 {
     cnt_frame++;
+    if (cnt_frame == 50) {
+        HAL_DCMIPP_CSI_PIPE_Stop(&hdcmipp, DCMIPP_PIPE1, DCMIPP_VIRTUAL_CHANNEL0);
+        frame_ready = true;
+    }
     if (pipe == DCMIPP_PIPE1) frame_ready = true;
 }
 void HAL_DCMIPP_PIPE_ErrorCallback(DCMIPP_HandleTypeDef *h, uint32_t pipe) { cnt_pipe_err++; last_err = h->ErrorCode; }
@@ -65,6 +70,11 @@ void HAL_DCMIPP_ErrorCallback(DCMIPP_HandleTypeDef *h) { cnt_err++; last_err = h
 void HAL_DCMIPP_CSI_StartOfFrameEventCallback(DCMIPP_HandleTypeDef *h, uint32_t vc) { cnt_sof++; }
 void HAL_DCMIPP_CSI_EndOfFrameEventCallback(DCMIPP_HandleTypeDef *h, uint32_t vc) { cnt_eof++; }
 void HAL_DCMIPP_CSI_LineErrorCallback(DCMIPP_HandleTypeDef *h, uint32_t lane) { cnt_lerr++; last_err = h->ErrorCode; }
+}
+static void delay_usb(uint32_t ms)
+{
+    uint32_t t = HAL_GetTick();
+    while (HAL_GetTick() - t < ms) ux_system_tasks_run();
 }
 
 /* Питание и сброс камеры (последовательность из BSP_CAMERA_HwReset примера ST):
@@ -82,13 +92,13 @@ static void camera_hw_reset(void)
     g.Pin = GPIO_PIN_2;  HAL_GPIO_Init(GPIOD, &g);
 
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET);
-    HAL_Delay(100);
+    delay_usb(100);
     HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, GPIO_PIN_RESET);
-    HAL_Delay(100);
+    delay_usb(100);
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET);
-    HAL_Delay(100);
+    delay_usb(100);
     HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, GPIO_PIN_SET);
-    HAL_Delay(100);
+    delay_usb(100);
 }
 
 extern "C" int main(void)
@@ -100,16 +110,16 @@ extern "C" int main(void)
   MX_I2C1_Init();
   MX_USB1_OTG_HS_PCD_Init();
   MX_USBX_Init();
-
+  
+  HAL_PCD_Start(&hpcd_USB_OTG_HS1);
+  delay_usb(2000);
   /* 1) питание и reset камеры */
   camera_hw_reset();
+  SystemIsolation_Config();
 
-  /* 2) CSI + DCMIPP (PIPE1: демозаика, downsize, RGB565) */
   MX_DCMIPP_Init();
   __HAL_DCMIPP_CSI_ENABLE_IT(CSI, DCMIPP_CSI_IT_SOF0 | DCMIPP_CSI_IT_EOF0);
 
-  /* 3) сенсор по I2C: только таблицы регистров, БЕЗ запуска стрима
-        (убедитесь, что Imx335::Init() не вызывает SetStream(true)) */
   uint32_t data = 0xFF;
   static I2c i2c1(hi2c1, 1000);
   i2c1.Init();
@@ -118,19 +128,32 @@ extern "C" int main(void)
   data = imx335.ReadId();
   auto res = imx335.Init();
   (void)data; (void)res;
-
-  /* 4) старт захвата */
+  // imx335.EnableTestPattern(2);
+  // uint16_t *px = (uint16_t*)frame_buf;
+  // for (int y = 0; y < FRAME_H; y++)
+  //   for (int x = 0; x < FRAME_W; x++)
+  //     px[y*FRAME_W + x] = (x < 213) ? 0xF800 : (x < 426) ? 0x07E0 : 0x001F;
+  memset(frame_buf, 0x55, FRAME_SIZE);
   if (HAL_DCMIPP_CSI_PIPE_Start(&hdcmipp, DCMIPP_PIPE1, DCMIPP_VIRTUAL_CHANNEL0,
                                 (uint32_t)frame_buf, DCMIPP_MODE_CONTINUOUS) != HAL_OK)
   {
       Error_Handler();
   }
 
-  /* 5) только теперь стрим на сенсоре */
   imx335.SetStream(true);
-  HAL_Delay(20);
+  delay_usb(20);
 
-  enum { IDLE, SENDING } tx = IDLE;
+  /* Протокол по USB CDC: заголовок 16 байт + кадр RGB565 (little-endian)
+     magic 'FRM1' (4) | width u16 | height u16 | size u32 | frame_id u32 */
+  struct __attribute__((packed)) FrameHdr {
+      char     magic[4];
+      uint16_t w, h;
+      uint32_t size;
+      uint32_t id;
+  };
+  static FrameHdr hdr;
+  uint32_t frame_id = 0;
+  enum { IDLE, SEND_HDR, SEND_DATA } tx = IDLE;
 
   while (1)
   {
@@ -144,12 +167,26 @@ extern "C" int main(void)
     {
         frame_ready = false;
         /* если включён D-Cache: SCB_InvalidateDCache_by_Addr(frame_buf, FRAME_SIZE); */
-        tx = SENDING;
+        hdr = { {'F','R','M','1'}, FRAME_W, FRAME_H, FRAME_SIZE, frame_id++ };
+        tx = SEND_HDR;
     }
-    if (tx == SENDING)
+    if (tx == SEND_HDR)
+    {
+        int r = CdcAcm_WriteStep((uint8_t*)&hdr, sizeof(hdr));
+        if (r == 1) tx = SEND_DATA;
+        else if (r < 0) tx = IDLE;
+    }
+    else if (tx == SEND_DATA)
     {
         int r = CdcAcm_WriteStep(frame_buf, FRAME_SIZE);
-        if (r != 0) tx = IDLE;   /* 1 = отправлено, -1 = ошибка */
+        if (r != 0)
+        {
+            tx = IDLE;
+            // /* следующий кадр */
+            // HAL_DCMIPP_CSI_PIPE_Stop(&hdcmipp, DCMIPP_PIPE1, DCMIPP_VIRTUAL_CHANNEL0);
+            // HAL_DCMIPP_CSI_PIPE_Start(&hdcmipp, DCMIPP_PIPE1, DCMIPP_VIRTUAL_CHANNEL0,
+            //                           (uint32_t)frame_buf, DCMIPP_MODE_SNAPSHOT);
+        }
     }
   }
 }
