@@ -1,4 +1,8 @@
 {
     "python-envs.defaultEnvManager": "ms-python.python:conda",
-    "python-envs.defaultPackageManager": "ms-python.python:conda"
+    "python-envs.defaultPackageManager": "ms-python.python:conda",
+    "clangd.arguments": [
+        "--compile-commands-dir=${workspaceFolder}/FSBL/build",
+        "--query-driver=/usr/bin/arm-none-eabi-*"
+    ]
 }
