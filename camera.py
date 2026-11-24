@@ -1,36 +1,106 @@
 #!/usr/bin/env python3
-"""Просмотр кадров по USB CDC от STM32N6 (IMX335): RGB565 ('FRM1') и JPEG ('JPG1').
+"""Просмотр кадров по USB CDC от STM32N6 (IMX335) на Qt.
 
-pip install pyserial numpy pillow
 Протокол: magic(4) | w u16 | h u16 | size u32 | id u32 | данные
+    'FRM1' — RGB565 little-endian
+    'JPG1' — JPEG
+
+В списке портов показываются только ACM/USB устройства:
+ttyACM*, ttyUSB*, usbmodem*, usbserial*, COM* с USB VID/PID.
+
+pip install pyserial numpy pillow PySide6
+(также работает с PyQt6/PyQt5, если PySide6 не установлен)
 """
 import io
-import queue
 import struct
 import threading
 import time
-import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
 
 import numpy as np
 import serial
 import serial.tools.list_ports
-from PIL import Image, ImageTk
+from PIL import Image
+
+try:                                    # Qt-биндинги
+    from PySide6 import QtCore, QtGui, QtWidgets
+    _Signal = QtCore.Signal
+except ImportError:
+    try:
+        from PyQt6 import QtCore, QtGui, QtWidgets
+        _Signal = QtCore.pyqtSignal
+    except ImportError:
+        try:
+            from PyQt5 import QtCore, QtGui, QtWidgets
+            _Signal = QtCore.pyqtSignal
+        except ImportError as e:
+            raise SystemExit(
+                "Не найден Qt для Python. Установите: pip install PySide6") from e
+
+
+# Совместимость PyQt5/PyQt6/PySide6: scoped-enum или обычный enum
+def _qt_enum(owner, scoped, plain):
+    obj = owner
+    for part in scoped.split("."):
+        obj = getattr(obj, part, None)
+        if obj is None:
+            break
+    return obj if obj is not None else getattr(owner, plain)
+
+
+ALIGN_CENTER = _qt_enum(QtCore.Qt, "AlignmentFlag.AlignCenter", "AlignCenter")
+HORIZONTAL = _qt_enum(QtCore.Qt, "Orientation.Horizontal", "Horizontal")
+KEEP_ASPECT = _qt_enum(QtCore.Qt, "AspectRatioMode.KeepAspectRatio", "KeepAspectRatio")
+SMOOTH = _qt_enum(QtCore.Qt, "TransformationMode.SmoothTransformation", "SmoothTransformation")
+IGNORED = _qt_enum(QtWidgets.QSizePolicy, "Policy.Ignored", "Ignored")
+RGB888 = _qt_enum(QtGui.QImage, "Format.Format_RGB888", "Format_RGB888")
 
 MAGICS = (b"FRM1", b"JPG1")
 HDR = struct.Struct("<4sHHII")
 
 
+# --------------------------------------------------------------------------
+# Порты: только ACM и USB
+# --------------------------------------------------------------------------
+_ACM_USB_MARKERS = ("ttyacm", "ttyusb", "usbmodem", "usbserial", "usb")
+
+
+def _is_acm_or_usb(info):
+    dev = (info.device or "").lower()
+    hwid = (info.hwid or "").lower()
+    desc = (info.description or "").lower()
+    if any(k in dev for k in _ACM_USB_MARKERS):
+        return True
+    if getattr(info, "vid", None) is not None:      # USB VID/PID определён
+        return True
+    return "usb" in hwid or "acm" in hwid or "acm" in desc or "usb" in desc
+
+
+def _port_priority(info):
+    dev = (info.device or "").lower()
+    hwid = (info.hwid or "").lower()
+    # CDC ACM (STM32) — выше остальных USB-серийников
+    return (0 if ("ttyacm" in dev or "acm" in hwid) else 1, info.device)
+
+
 def list_ports():
-    return [p.device for p in sorted(serial.tools.list_ports.comports(),
-                                     key=lambda p: p.device)]
+    ports = [p for p in serial.tools.list_ports.comports() if _is_acm_or_usb(p)]
+    return sorted(ports, key=_port_priority)
 
 
-class Reader(threading.Thread):
-    def __init__(self, port, out_q, err_q):
-        super().__init__(daemon=True)
-        self.port, self.out_q, self.err_q = port, out_q, err_q
-        self.stop_evt = threading.Event()
+# --------------------------------------------------------------------------
+# Фоновое чтение порта
+# --------------------------------------------------------------------------
+class Reader(QtCore.QThread):
+    frame_received = _Signal(object)    # (magic, fid, w, h, data)
+    error = _Signal(str)
+
+    def __init__(self, port, parent=None):
+        super().__init__(parent)
+        self.port = port
+        self._stop = threading.Event()
+
+    def stop(self):
+        self._stop.set()
 
     @staticmethod
     def _find(buf):
@@ -41,53 +111,49 @@ class Reader(threading.Thread):
         try:
             ser = serial.Serial(self.port, timeout=0.2)
         except Exception as e:
-            self.err_q.put(f"Не удалось открыть {self.port}: {e}")
+            self.error.emit(f"Не удалось открыть {self.port}: {e}")
             return
+
         buf = bytearray()
         try:
-            while not self.stop_evt.is_set():
+            while not self._stop.is_set():
                 chunk = ser.read(max(1, ser.in_waiting))
                 if chunk:
                     buf += chunk
                 while True:
                     i = self._find(buf)
                     if i < 0:
-                        del buf[:-3]
+                        del buf[:-3]                    # хвост на случай разрыва magic
                         break
                     if i > 0:
                         del buf[:i]
                     if len(buf) < HDR.size:
                         break
                     magic, w, h, size, fid = HDR.unpack_from(buf)
-                    ok = (size == w * h * 2) if magic == b"FRM1" else (0 < size < 8 * 1024 * 1024)
+                    ok = (size == w * h * 2) if magic == b"FRM1" \
+                        else (0 < size < 8 * 1024 * 1024)
                     if not ok:
-                        del buf[:4]
+                        del buf[:4]                     # ложный magic
                         continue
                     if len(buf) < HDR.size + size:
                         break
                     data = bytes(buf[HDR.size:HDR.size + size])
                     del buf[:HDR.size + size]
-                    # JPEG должен начинаться с маркера SOI 0xFFD8
                     if magic == b"JPG1" and not data.startswith(b"\xff\xd8"):
-                        continue
-                    if self.out_q.full():
-                        try:
-                            self.out_q.get_nowait()
-                        except queue.Empty:
-                            pass
-                    self.out_q.put((magic, fid, w, h, data))
+                        continue                        # битый JPEG
+                    self.frame_received.emit((magic, fid, w, h, data))
         except Exception as e:
-            self.err_q.put(f"Ошибка порта: {e}")
+            self.error.emit(f"Ошибка порта: {e}")
         finally:
             try:
                 ser.close()
             except Exception:
                 pass
 
-    def stop(self):
-        self.stop_evt.set()
 
-
+# --------------------------------------------------------------------------
+# Декодирование кадра
+# --------------------------------------------------------------------------
 def rgb565_to_rgb(data, w, h, gain):
     v = np.frombuffer(data, dtype="<u2").reshape(h, w)
     r = ((v >> 11) & 0x1F).astype(np.uint16)
@@ -100,129 +166,246 @@ def rgb565_to_rgb(data, w, h, gain):
     return np.clip(rgb, 0, 255).astype(np.uint8), int(v.min()), int(v.max())
 
 
-class App(tk.Tk):
+def pil_to_qimage(img):
+    img = img.convert("RGB")
+    w, h = img.size
+    return QtGui.QImage(img.tobytes(), w, h, 3 * w, RGB888).copy()
+
+
+# --------------------------------------------------------------------------
+# Виджеты
+# --------------------------------------------------------------------------
+class ImageView(QtWidgets.QLabel):
+    """QLabel, который масштабирует картинку под размер окна."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAlignment(ALIGN_CENTER)
+        self.setMinimumSize(320, 240)
+        self.setStyleSheet("background:#202020;")
+        self.setSizePolicy(IGNORED, IGNORED)
+        self._image = None
+
+    def set_image(self, image):
+        self._image = image
+        self._update_pixmap()
+
+    def _update_pixmap(self):
+        if self._image is None or self._image.isNull():
+            return
+        pm = QtGui.QPixmap.fromImage(self._image)
+        pm = pm.scaled(self.size(), KEEP_ASPECT, SMOOTH)
+        self.setPixmap(pm)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._update_pixmap()
+
+
+class PortCombo(QtWidgets.QComboBox):
+    """QComboBox, который обновляет список портов при открытии."""
+
+    popup_about_to_show = _Signal()
+
+    def showPopup(self):
+        self.popup_about_to_show.emit()
+        super().showPopup()
+
+
+class App(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        self.title("IMX335 viewer")
-        self.frame_q = queue.Queue(maxsize=1)
-        self.err_q = queue.Queue()
+        self.setWindowTitle("IMX335 viewer (JPEG / RGB565)")
+        self.resize(960, 720)
+
         self.reader = None
-        self.last = None
-        self.pil = None
-        self.photo = None
-        self.t_fps, self.n_fps, self.fps = time.time(), 0, 0.0
+        self.frame = None           # последний сырой кадр
+        self.qimage = None          # текущая картинка (для сохранения)
+        self.fps = 0.0
+        self._fps_t = time.time()
+        self._fps_n = 0
 
-        top = ttk.Frame(self, padding=6)
-        top.pack(fill="x")
-        ttk.Label(top, text="Порт:").pack(side="left")
-        self.port_var = tk.StringVar()
-        self.port_cb = ttk.Combobox(top, textvariable=self.port_var, width=18, state="readonly")
-        self.port_cb.pack(side="left", padx=4)
-        ttk.Button(top, text="Обновить", command=self.refresh_ports).pack(side="left")
-        self.btn_conn = ttk.Button(top, text="Подключиться", command=self.toggle)
-        self.btn_conn.pack(side="left", padx=6)
+        self._build_ui()
+        self._refresh_ports()
 
-        ttk.Label(top, text="Яркость x (RGB565)").pack(side="left", padx=(12, 2))
-        self.gain = tk.DoubleVar(value=1.0)
-        ttk.Scale(top, from_=1, to=16, variable=self.gain, length=120,
-                  command=lambda _: self.redraw()).pack(side="left")
-        self.gain_lbl = ttk.Label(top, text="1.0", width=5)
-        self.gain_lbl.pack(side="left")
-        ttk.Button(top, text="Сохранить", command=self.save).pack(side="right")
+    # ---------------- UI ----------------
+    def _build_ui(self):
+        central = QtWidgets.QWidget()
+        self.setCentralWidget(central)
+        root = QtWidgets.QVBoxLayout(central)
+        root.setContentsMargins(6, 6, 6, 6)
+        root.setSpacing(6)
 
-        self.canvas = tk.Label(self, background="#202020")
-        self.canvas.pack(fill="both", expand=True)
-        self.status = tk.StringVar(value="Не подключено")
-        ttk.Label(self, textvariable=self.status, padding=4, anchor="w").pack(fill="x")
+        bar = QtWidgets.QHBoxLayout()
 
-        self.refresh_ports()
-        self.protocol("WM_DELETE_WINDOW", self.on_close)
-        self.after(30, self.poll)
+        bar.addWidget(QtWidgets.QLabel("Порт (ACM/USB):"))
+        self.port_cb = PortCombo()
+        self.port_cb.setMinimumWidth(220)
+        self.port_cb.popup_about_to_show.connect(self._refresh_ports)
+        bar.addWidget(self.port_cb)
 
-    def refresh_ports(self):
+        self.btn_refresh = QtWidgets.QPushButton("Обновить")
+        self.btn_refresh.clicked.connect(self._refresh_ports)
+        bar.addWidget(self.btn_refresh)
+
+        self.btn_conn = QtWidgets.QPushButton("Подключиться")
+        self.btn_conn.setCheckable(True)
+        self.btn_conn.clicked.connect(self._toggle)
+        bar.addWidget(self.btn_conn)
+
+        bar.addSpacing(16)
+        bar.addWidget(QtWidgets.QLabel("Яркость x (RGB565):"))
+        self.gain = QtWidgets.QSlider(HORIZONTAL)
+        self.gain.setRange(10, 160)             # 1.0 .. 16.0
+        self.gain.setValue(10)
+        self.gain.setFixedWidth(140)
+        self.gain.valueChanged.connect(self._gain_changed)
+        bar.addWidget(self.gain)
+        self.gain_lbl = QtWidgets.QLabel("1.0")
+        self.gain_lbl.setFixedWidth(32)
+        bar.addWidget(self.gain_lbl)
+
+        bar.addStretch(1)
+        self.btn_save = QtWidgets.QPushButton("Сохранить")
+        self.btn_save.clicked.connect(self._save)
+        bar.addWidget(self.btn_save)
+
+        root.addLayout(bar)
+
+        self.view = ImageView()
+        root.addWidget(self.view, 1)
+
+        self.status = QtWidgets.QLabel("Не подключено")
+        self.status.setContentsMargins(4, 0, 4, 0)
+        root.addWidget(self.status)
+
+    def _gain(self):
+        return self.gain.value() / 10.0
+
+    # ---------------- Порты ----------------
+    def _refresh_ports(self):
         ports = list_ports()
-        self.port_cb["values"] = ports
-        if ports and self.port_var.get() not in ports:
-            self.port_var.set(ports[-1])
-        elif not ports:
-            self.port_var.set("")
+        current = self.port_cb.currentData()
 
-    def toggle(self):
-        if self.reader:
-            self.disconnect()
+        self.port_cb.blockSignals(True)
+        self.port_cb.clear()
+        for p in ports:
+            label = f"{p.device} — {p.description}" if p.description else p.device
+            self.port_cb.addItem(label, p.device)
+        if current:
+            idx = self.port_cb.findData(current)
+            if idx >= 0:
+                self.port_cb.setCurrentIndex(idx)
+        self.port_cb.blockSignals(False)
+
+        if self.reader is None:
+            self.btn_conn.setEnabled(bool(ports))
+            if not ports:
+                self.status.setText("Не найдено ACM/USB портов (ttyACM / ttyUSB / COM-USB)")
+
+    # ---------------- Подключение ----------------
+    def _toggle(self):
+        if self.reader is not None:
+            self._disconnect()
             return
-        port = self.port_var.get()
+        port = self.port_cb.currentData()
         if not port:
-            messagebox.showwarning("Порт", "Выберите порт")
+            self.btn_conn.setChecked(False)
+            QtWidgets.QMessageBox.warning(self, "Порт", "Выберите ACM/USB порт")
             return
-        self.reader = Reader(port, self.frame_q, self.err_q)
+        self._connect(port)
+
+    def _connect(self, port):
+        self.reader = Reader(port)
+        self.reader.frame_received.connect(self._on_frame)
+        self.reader.error.connect(self._on_error)
         self.reader.start()
-        self.btn_conn.config(text="Отключиться")
-        self.port_cb.config(state="disabled")
-        self.status.set(f"Подключено к {port}, жду кадр...")
 
-    def disconnect(self):
-        if self.reader:
+        self.btn_conn.setChecked(True)
+        self.btn_conn.setText("Отключиться")
+        self.port_cb.setEnabled(False)
+        self.btn_refresh.setEnabled(False)
+        self.status.setText(f"Подключено к {port}, жду кадр...")
+
+    def _disconnect(self):
+        if self.reader is not None:
             self.reader.stop()
-            self.reader.join(timeout=1)
+            self.reader.wait()          # read() имеет timeout 0.2 c
             self.reader = None
-        self.btn_conn.config(text="Подключиться")
-        self.port_cb.config(state="readonly")
-        self.status.set("Не подключено")
+        self.btn_conn.setChecked(False)
+        self.btn_conn.setText("Подключиться")
+        self.port_cb.setEnabled(True)
+        self.btn_refresh.setEnabled(True)
+        self.btn_conn.setEnabled(self.port_cb.count() > 0)
+        self.status.setText("Не подключено")
 
-    def redraw(self):
-        g = float(self.gain.get())
-        self.gain_lbl.config(text=f"{g:.1f}")
-        if self.last is None:
+    def _on_error(self, message):
+        if self.reader is not None:
+            self._disconnect()
+        QtWidgets.QMessageBox.critical(self, "Ошибка", message)
+
+    # ---------------- Кадры ----------------
+    def _on_frame(self, frame):
+        self.frame = frame
+        self._fps_n += 1
+        now = time.time()
+        if now - self._fps_t >= 1.0:
+            self.fps = self._fps_n / (now - self._fps_t)
+            self._fps_n = 0
+            self._fps_t = now
+        self._render()
+
+    def _render(self):
+        if self.frame is None:
             return
-        magic, fid, w, h, data = self.last
-        extra = ""
+        magic, fid, w, h, data = self.frame
         try:
             if magic == b"JPG1":
-                self.pil = Image.open(io.BytesIO(data)).convert("RGB")
-                extra = f"JPEG {len(data)//1024} KB"
+                self.qimage = pil_to_qimage(Image.open(io.BytesIO(data)))
+                extra = f"JPEG {len(data) // 1024} KB"
             else:
-                rgb, mn, mx = rgb565_to_rgb(data, w, h, g)
-                self.pil = Image.fromarray(rgb)
-                extra = f"RGB565 raw min {mn} max {mx}"
+                rgb, mn, mx = rgb565_to_rgb(data, w, h, self._gain())
+                hh, ww, _ = rgb.shape
+                self.qimage = QtGui.QImage(rgb.tobytes(), ww, hh, 3 * ww, RGB888).copy()
+                extra = f"RGB565 min {mn} max {mx}"
         except Exception as e:
-            self.status.set(f"Ошибка декодирования кадра {fid}: {e}")
+            self.status.setText(f"Ошибка декодирования кадра {fid}: {e}")
             return
-        self.photo = ImageTk.PhotoImage(self.pil)
-        self.canvas.config(image=self.photo)
-        self.status.set(f"кадр {fid}   {w}x{h}   {self.fps:.1f} fps   {extra}")
 
-    def poll(self):
-        try:
-            msg = self.err_q.get_nowait()
-            self.disconnect()
-            messagebox.showerror("Ошибка", msg)
-        except queue.Empty:
-            pass
-        try:
-            self.last = self.frame_q.get_nowait()
-            self.redraw()
-            self.n_fps += 1
-            now = time.time()
-            if now - self.t_fps >= 1.0:
-                self.fps = self.n_fps / (now - self.t_fps)
-                self.n_fps, self.t_fps = 0, now
-        except queue.Empty:
-            pass
-        self.after(30, self.poll)
+        self.view.set_image(self.qimage)
+        self.status.setText(f"кадр {fid}   {w}x{h}   {self.fps:.1f} fps   {extra}")
 
-    def save(self):
-        if self.pil is None:
+    def _gain_changed(self, _value):
+        self.gain_lbl.setText(f"{self._gain():.1f}")
+        if self.frame is not None and self.frame[0] == b"FRM1":
+            self._render()
+
+    # ---------------- Сохранение ----------------
+    def _save(self):
+        if self.qimage is None:
             return
-        path = filedialog.asksaveasfilename(defaultextension=".png",
-                                            filetypes=[("PNG", "*.png"), ("JPEG", "*.jpg")])
-        if path:
-            self.pil.save(path)
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Сохранить кадр", "",
+            "PNG (*.png);;JPEG (*.jpg *.jpeg)")
+        if not path:
+            return
+        fmt = "JPEG" if path.lower().endswith((".jpg", ".jpeg")) else "PNG"
+        if not self.qimage.save(path, fmt, 95):
+            QtWidgets.QMessageBox.warning(self, "Сохранение",
+                                          f"Не удалось сохранить {path}")
 
-    def on_close(self):
-        self.disconnect()
-        self.destroy()
+    # ---------------- Закрытие ----------------
+    def closeEvent(self, event):
+        self._disconnect()
+        super().closeEvent(event)
+
+
+def main():
+    app = QtWidgets.QApplication([])
+    win = App()
+    win.show()
+    raise SystemExit(app.exec())
 
 
 if __name__ == "__main__":
-    App().mainloop()
+    main()
