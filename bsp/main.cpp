@@ -40,6 +40,7 @@ int CdcAcm_WriteStep(uint8_t *buf, uint32_t len)
 #include "i2c.hpp"
 #include "imx335.hpp"
 #include "dcmipp.h"
+#include "jpeg.hpp"
 
 /* Кадр: 640 * 480 * 2 (RGB565) = 614400 байт, AXISRAM1.
    Проверьте, что линкер не использует 0x34000000..0x34096000 */
@@ -53,6 +54,7 @@ static uint8_t * const frame_buf = (uint8_t*)0x34000000;
 volatile bool     frame_ready;
 volatile uint32_t cnt_vsync, cnt_frame, cnt_err, cnt_pipe_err, cnt_sof, cnt_eof, cnt_lerr;
 volatile uint32_t last_err;
+volatile uint32_t cnt_jpeg, cnt_jpeg_err, last_jpeg_err;
 
 extern "C" {
 void HAL_DCMIPP_PIPE_VsyncEventCallback(DCMIPP_HandleTypeDef *h, uint32_t pipe) { cnt_vsync++; }
@@ -126,18 +128,29 @@ extern "C" int main(void)
   (void)data; (void)res;
   // imx335.EnableTestPattern(2);
 
+  static Jpeg jpeg;
+  static uint8_t jpeg_out[100*1024] __attribute__((aligned(32)));
+  if (!jpeg.Init(FRAME_W, FRAME_H, 80)) Error_Handler();
+
   memset(frame_buf, 0x55, FRAME_SIZE);
-  if (HAL_DCMIPP_CSI_PIPE_Start(&hdcmipp, DCMIPP_PIPE1, DCMIPP_VIRTUAL_CHANNEL0,
-                                (uint32_t)frame_buf, DCMIPP_MODE_CONTINUOUS) != HAL_OK)
+
+  /* Захват по одному кадру. В SNAPSHOT режиме DCMIPP сам останавливает пайп
+     после конца кадра (PipeState -> READY), поэтому буфер можно кодировать
+     без гонки с записью. Каждый следующий кадр "взводим" этим лямбда-хелпером. */
+  auto start_capture = []()
   {
-      Error_Handler();
-  }
+      frame_ready = false;
+      if (HAL_DCMIPP_CSI_PIPE_Start(&hdcmipp, DCMIPP_PIPE1, DCMIPP_VIRTUAL_CHANNEL0,
+                                    (uint32_t)frame_buf, DCMIPP_MODE_SNAPSHOT) != HAL_OK)
+          Error_Handler();
+  };
 
   imx335.SetStream(true);
   delay_usb(20);
+  start_capture();
 
-  /* Протокол по USB CDC: заголовок 16 байт + кадр RGB565 (little-endian)
-     magic 'FRM1' (4) | width u16 | height u16 | size u32 | frame_id u32 */
+  /* Протокол по USB CDC: заголовок 16 байт + JPEG (little-endian)
+     magic 'JPG1' (4) | width u16 | height u16 | size u32 | frame_id u32 */
   struct __attribute__((packed)) FrameHdr {
       char     magic[4];
       uint16_t w, h;
@@ -146,6 +159,7 @@ extern "C" int main(void)
   };
   static FrameHdr hdr;
   uint32_t frame_id = 0;
+  uint32_t jpeg_len = 0;
   enum { IDLE, SEND_HDR, SEND_DATA } tx = IDLE;
 
   while (1)
@@ -159,10 +173,27 @@ extern "C" int main(void)
     if (frame_ready && tx == IDLE)
     {
         frame_ready = false;
-        /* если включён D-Cache: SCB_InvalidateDCache_by_Addr(frame_buf, FRAME_SIZE); */
-        hdr = { {'F','R','M','1'}, FRAME_W, FRAME_H, FRAME_SIZE, frame_id++ };
-        tx = SEND_HDR;
+
+        /* Кадр уже полностью в frame_buf, DCMIPP остановлен. */
+        jpeg_len = jpeg.Encode((const uint16_t*)frame_buf, jpeg_out, sizeof(jpeg_out));
+
+        /* Сразу готовим следующий кадр: он будет сниматься, пока идёт USB-передача. */
+        start_capture();
+
+        if (jpeg_len)
+        {
+            cnt_jpeg++;
+            hdr = { {'J','P','G','1'}, FRAME_W, FRAME_H, jpeg_len, frame_id++ };
+            tx = SEND_HDR;
+        }
+        else
+        {
+            /* при ошибке кодирования кадр просто пропускаем */
+            cnt_jpeg_err++;
+            last_jpeg_err = jpeg.LastError();
+        }
     }
+
     if (tx == SEND_HDR)
     {
         int r = CdcAcm_WriteStep((uint8_t*)&hdr, sizeof(hdr));
@@ -171,15 +202,9 @@ extern "C" int main(void)
     }
     else if (tx == SEND_DATA)
     {
-        int r = CdcAcm_WriteStep(frame_buf, FRAME_SIZE);
-        if (r != 0)
-        {
-            tx = IDLE;
-            /* следующий кадр */
-            HAL_DCMIPP_CSI_PIPE_Stop(&hdcmipp, DCMIPP_PIPE1, DCMIPP_VIRTUAL_CHANNEL0);
-            HAL_DCMIPP_CSI_PIPE_Start(&hdcmipp, DCMIPP_PIPE1, DCMIPP_VIRTUAL_CHANNEL0,
-                                      (uint32_t)frame_buf, DCMIPP_MODE_SNAPSHOT);
-        }
+        /* отправляем ровно jpeg_len байт и не трогаем jpeg_out до конца передачи */
+        int r = CdcAcm_WriteStep(jpeg_out, jpeg_len);
+        if (r != 0) tx = IDLE;
     }
   }
 }

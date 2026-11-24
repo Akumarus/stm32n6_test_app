@@ -15,6 +15,7 @@ set(MX_Include_Dirs
     ${CMAKE_CURRENT_SOURCE_DIR}/../Drivers/STM32N6xx_HAL_Driver/Inc
     ${CMAKE_CURRENT_SOURCE_DIR}/../Drivers/CMSIS/Device/ST/STM32N6xx/Include
     ${CMAKE_CURRENT_SOURCE_DIR}/../Drivers/STM32N6xx_HAL_Driver/Inc/Legacy
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Utilities/JPEG
     ${CMAKE_CURRENT_SOURCE_DIR}/../Middlewares/ST/usbx/common/core/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/../Middlewares/ST/usbx/ports/generic/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/../Middlewares/ST/usbx/common/usbx_stm32_device_controllers
@@ -28,6 +29,7 @@ set(MX_Application_Src
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/csi.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/dcmipp.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/i2c.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/jpeg.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/usb_otg.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/stm32n6xx_it.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/stm32n6xx_hal_msp.c
@@ -56,6 +58,7 @@ set(STM32_Drivers_Src
     ${CMAKE_CURRENT_SOURCE_DIR}/../Drivers/STM32N6xx_HAL_Driver/Src/stm32n6xx_hal_dcmipp.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../Drivers/STM32N6xx_HAL_Driver/Src/stm32n6xx_hal_i2c.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../Drivers/STM32N6xx_HAL_Driver/Src/stm32n6xx_hal_i2c_ex.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Drivers/STM32N6xx_HAL_Driver/Src/stm32n6xx_hal_jpeg.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../Drivers/STM32N6xx_HAL_Driver/Src/stm32n6xx_hal_rif.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../Drivers/STM32N6xx_HAL_Driver/Src/stm32n6xx_hal_pcd.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../Drivers/STM32N6xx_HAL_Driver/Src/stm32n6xx_hal_pcd_ex.c
@@ -155,6 +158,9 @@ set(usbx_Src
     ${CMAKE_CURRENT_SOURCE_DIR}/../Middlewares/ST/usbx/common/usbx_stm32_device_controllers/ux_dcd_stm32_uninitialize.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../Middlewares/ST/usbx/common/usbx_stm32_device_controllers/ux_dcd_stm32_transfer_abort.c
 )
+set(Utilities_Src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Utilities/JPEG/jpeg_utils.c
+)
 
 # Link directories setup
 set(MX_LINK_DIRS
@@ -164,7 +170,7 @@ set(MX_LINK_DIRS
 set (MX_LINK_LIBS 
     STM32_Drivers
     ${TOOLCHAIN_LINK_LIBRARIES}
-    usbx	
+    usbx	Utilities	
     
 )
 # Interface library for includes and symbols
@@ -181,6 +187,11 @@ target_link_libraries(STM32_Drivers PUBLIC stm32cubemx)
 add_library(usbx OBJECT)
 target_sources(usbx PRIVATE ${usbx_Src})
 target_link_libraries(usbx PUBLIC stm32cubemx)
+
+# Create Utilities static library
+add_library(Utilities OBJECT)
+target_sources(Utilities PRIVATE ${Utilities_Src})
+target_link_libraries(Utilities PUBLIC stm32cubemx)
 
 
 # Add STM32CubeMX generated application sources to the project

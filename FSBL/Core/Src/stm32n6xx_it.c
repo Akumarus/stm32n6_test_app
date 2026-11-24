@@ -56,6 +56,7 @@
 
 /* External variables --------------------------------------------------------*/
 extern DCMIPP_HandleTypeDef hdcmipp;
+extern JPEG_HandleTypeDef hjpeg;
 extern PCD_HandleTypeDef hpcd_USB_OTG_HS1;
 /* USER CODE BEGIN EV */
 
@@ -226,6 +227,20 @@ void DCMIPP_IRQHandler(void)
   /* USER CODE BEGIN DCMIPP_IRQn 1 */
 
   /* USER CODE END DCMIPP_IRQn 1 */
+}
+
+/**
+  * @brief This function handles JPEG global interrupt.
+  */
+void JPEG_IRQHandler(void)
+{
+  /* USER CODE BEGIN JPEG_IRQn 0 */
+
+  /* USER CODE END JPEG_IRQn 0 */
+  HAL_JPEG_IRQHandler(&hjpeg);
+  /* USER CODE BEGIN JPEG_IRQn 1 */
+
+  /* USER CODE END JPEG_IRQn 1 */
 }
 
 /**

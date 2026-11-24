@@ -46,7 +46,7 @@ _estack = ORIGIN(RAM) + LENGTH(RAM); /* end of "RAM" Ram type memory */
 _sstack = _estack - _Min_Stack_Size;
 
 _Min_Heap_Size = 0x200;      /* required amount of heap  */
-_Min_Stack_Size = 0x800; /* required amount of stack */
+_Min_Stack_Size = 0x2000; /* required amount of stack */
 
 /* Sections */
 SECTIONS
@@ -141,6 +141,15 @@ SECTIONS
     FILL(0x00);
   } >ROM
   _eNSCVeneer = .;
+
+  .mcu_buf (NOLOAD) :
+  {
+    . = ALIGN(32);
+    *(.mcu_buf)
+    *(.mcu_buf*)
+    . = ALIGN(32);
+  } >MCU
+
   /* Uninitialized data section into "RAM" Ram type memory */
   _sidata = LOADADDR(.data);
 

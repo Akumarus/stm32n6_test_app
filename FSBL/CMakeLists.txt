@@ -61,6 +61,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../bsp/hal/i2c.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../bsp/hal/jpeg.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../bsp/sccb/sccb.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../bsp/main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../bsp/imx335/imx335.cpp
